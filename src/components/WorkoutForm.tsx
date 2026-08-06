@@ -34,6 +34,8 @@ export type WorkoutFormInitial = {
 
 type Props = {
   initial?: WorkoutFormInitial;
+  /** フォーム上部に出す案内文（例: 「複製元」の説明）。不要なら省略する */
+  banner?: string;
   submitLabel: string;
   onSubmit: (input: { date: string; memo: string | null; exercises: ExerciseDraft[] }) => Promise<void>;
 };
@@ -88,7 +90,7 @@ function draftExercisesFromInitial(initial: WorkoutFormInitial | undefined): Dra
   }));
 }
 
-export default function WorkoutForm({ initial, submitLabel, onSubmit }: Props) {
+export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: Props) {
   const [date, setDate] = useState(initial?.date ?? todayString());
   const [memo, setMemo] = useState(initial?.memo ?? '');
   const [exercises, setExercises] = useState<DraftExercise[]>(() => draftExercisesFromInitial(initial));
@@ -185,6 +187,12 @@ export default function WorkoutForm({ initial, submitLabel, onSubmit }: Props) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {banner ? (
+          <View style={styles.banner}>
+            <Text style={styles.bannerText}>{banner}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.dateRow}>
           <Pressable style={styles.dateArrow} onPress={() => setDate((d) => shiftDateString(d, -1))} hitSlop={8}>
             <Text style={styles.dateArrowText}>◀</Text>
@@ -354,6 +362,18 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.7,
+  },
+  banner: {
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  bannerText: {
+    fontSize: 13,
+    color: colors.text,
   },
   dateRow: {
     flexDirection: 'row',

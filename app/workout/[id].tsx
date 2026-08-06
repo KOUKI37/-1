@@ -74,16 +74,25 @@ export default function WorkoutDetailScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.actionRow}>
+      <View style={styles.actionArea}>
         <Pressable
-          style={({ pressed }) => [styles.editButton, pressed && styles.editButtonPressed]}
-          onPress={() => router.push({ pathname: '/workout/[id]/edit', params: { id: String(workoutId) } })}
+          style={({ pressed }) => [styles.copyButton, pressed && styles.copyButtonPressed]}
+          onPress={() => router.push({ pathname: '/workout/new', params: { copyFrom: String(workoutId) } })}
         >
-          <Text style={styles.editButtonText}>編集する</Text>
+          <Text style={styles.copyButtonText}>この内容をコピーして今日の記録にする</Text>
         </Pressable>
-        <Pressable style={({ pressed }) => [styles.deleteButton, pressed && styles.deleteButtonPressed]} onPress={handleDelete}>
-          <Text style={styles.deleteButtonText}>削除する</Text>
-        </Pressable>
+
+        <View style={styles.actionRow}>
+          <Pressable
+            style={({ pressed }) => [styles.editButton, pressed && styles.editButtonPressed]}
+            onPress={() => router.push({ pathname: '/workout/[id]/edit', params: { id: String(workoutId) } })}
+          >
+            <Text style={styles.editButtonText}>編集する</Text>
+          </Pressable>
+          <Pressable style={({ pressed }) => [styles.deleteButton, pressed && styles.deleteButtonPressed]} onPress={handleDelete}>
+            <Text style={styles.deleteButtonText}>削除する</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -134,23 +143,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
   },
+  actionArea: {
+    margin: 16,
+    gap: 12,
+  },
+  copyButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    backgroundColor: colors.accent,
+  },
+  copyButtonPressed: {
+    opacity: 0.85,
+  },
+  copyButtonText: {
+    color: colors.accentText,
+    fontSize: 16,
+    fontWeight: '700',
+  },
   actionRow: {
     flexDirection: 'row',
     gap: 12,
-    margin: 16,
   },
   editButton: {
     flex: 1,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: colors.accent,
+    borderWidth: 1,
+    borderColor: colors.accent,
   },
   editButtonPressed: {
-    opacity: 0.8,
+    backgroundColor: colors.background,
   },
   editButtonText: {
-    color: colors.accentText,
+    color: colors.accent,
     fontSize: 16,
     fontWeight: '600',
   },
