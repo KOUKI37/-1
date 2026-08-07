@@ -1,9 +1,10 @@
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import migrations from '../drizzle/migrations';
+import CenteredMessage from '../src/components/CenteredMessage';
 import { db } from '../src/db/client';
 import { colors } from '../src/theme/colors';
 
@@ -29,12 +30,7 @@ export default function RootLayout() {
   }
 
   if (!migrationSuccess) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-        <Text style={styles.loadingText}>準備中...</Text>
-      </View>
-    );
+    return <CenteredMessage loading text="準備中..." />;
   }
 
   return (
@@ -66,9 +62,6 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.background,
     padding: 24,
-  },
-  loadingText: {
-    color: colors.textMuted,
   },
   errorTitle: {
     fontSize: 16,
