@@ -1,10 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
 
+import CenteredMessage from '../../../src/components/CenteredMessage';
 import WorkoutForm, { type WorkoutFormInitial } from '../../../src/components/WorkoutForm';
 import { getWorkoutWithDetails, updateWorkoutWithDetails } from '../../../src/db/queries';
-import { colors } from '../../../src/theme/colors';
 
 /** 記録の編集画面。既存の内容を読み込んでフォームに渡し、保存すると丸ごと置き換える。 */
 export default function EditWorkoutScreen() {
@@ -22,9 +21,9 @@ export default function EditWorkoutScreen() {
       }
       setInitial({
         date: workout.date,
-        memo: workout.memo,
         exercises: workout.exerciseEntries.map((entry) => ({
           name: entry.name,
+          memo: entry.memo,
           sets: entry.sets.map((s) => ({ weight: s.weight, reps: s.reps })),
         })),
       });
@@ -32,19 +31,11 @@ export default function EditWorkoutScreen() {
   }, [workoutId]);
 
   if (initial === undefined) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.centerText}>読み込み中...</Text>
-      </View>
-    );
+    return <CenteredMessage loading text="読み込み中..." />;
   }
 
   if (initial === null) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.centerText}>この記録は見つかりませんでした</Text>
-      </View>
-    );
+    return <CenteredMessage text="この記録は見つかりませんでした" />;
   }
 
   return (
@@ -58,15 +49,3 @@ export default function EditWorkoutScreen() {
     />
   );
 }
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-  centerText: {
-    color: colors.textMuted,
-  },
-});

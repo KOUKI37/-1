@@ -12,8 +12,16 @@ import {
   View,
 } from 'react-native';
 
-import { listFrequentExerciseNames, type ExerciseDraft } from '../db/queries';
+import {
+  getLastExercisePerformance,
+  listFrequentExerciseNames,
+  listNextExerciseSuggestions,
+  type ExerciseDraft,
+  type ExercisePerformance,
+  type NextExerciseSuggestion,
+} from '../db/queries';
 import { colors } from '../theme/colors';
+import { formatDateJa, shiftDateString, toDateString, todayString } from '../utils/date';
 
 /**
  * 記録の入力フォーム（新規作成・編集の両方で使う共通部品）。
@@ -24,11 +32,10 @@ import { colors } from '../theme/colors';
  */
 
 type DraftSet = { key: string; weight: string; reps: string };
-type DraftExercise = { key: string; name: string; sets: DraftSet[] };
+type DraftExercise = { key: string; name: string; memo: string; sets: DraftSet[] };
 
 export type WorkoutFormInitial = {
   date: string;
-  memo: string | null;
   exercises: ExerciseDraft[];
 };
 
@@ -37,7 +44,7 @@ type Props = {
   /** フォーム上部に出す案内文（例: 「複製元」の説明）。不要なら省略する */
   banner?: string;
   submitLabel: string;
-  onSubmit: (input: { date: string; memo: string | null; exercises: ExerciseDraft[] }) => Promise<void>;
+  onSubmit: (input: { date: string; exercises: ExerciseDraft[] }) => Promise<void>;
 };
 
 let keySeed = 0;
@@ -51,34 +58,7 @@ function emptySet(): DraftSet {
 }
 
 function emptyExercise(): DraftExercise {
-  return { key: makeKey(), name: '', sets: [emptySet()] };
-}
-
-// 'YYYY-MM-DD' への変換は必ずローカルの年月日から組み立てる。
-// Date#toISOString() は UTC に変換してしまうため、日本のような UTC+ のタイムゾーンでは
-// 日付が意図せず前日にずれる（例: 1日進めたつもりが変化なし、1日戻すと2日戻る）。
-function toDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function todayString(): string {
-  return toDateString(new Date());
-}
-
-function shiftDateString(date: string, deltaDays: number): string {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + deltaDays);
-  return toDateString(d);
-}
-
-const WEEKDAY_JA = ['日', '月', '火', '水', '木', '金', '土'];
-
-function formatDateJa(date: string): string {
-  const d = new Date(`${date}T00:00:00`);
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${WEEKDAY_JA[d.getDay()]}）`;
+  return { key: makeKey(), name: '', memo: '', sets: [emptySet()] };
 }
 
 function draftExercisesFromInitial(initial: WorkoutFormInitial | undefined): DraftExercise[] {
@@ -86,15 +66,17 @@ function draftExercisesFromInitial(initial: WorkoutFormInitial | undefined): Dra
   return initial.exercises.map((ex) => ({
     key: makeKey(),
     name: ex.name,
+    memo: ex.memo ?? '',
     sets: ex.sets.length > 0 ? ex.sets.map((s) => ({ key: makeKey(), weight: String(s.weight), reps: String(s.reps) })) : [emptySet()],
   }));
 }
 
 export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: Props) {
   const [date, setDate] = useState(initial?.date ?? todayString());
-  const [memo, setMemo] = useState(initial?.memo ?? '');
   const [exercises, setExercises] = useState<DraftExercise[]>(() => draftExercisesFromInitial(initial));
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [nextSuggestionsByName, setNextSuggestionsByName] = useState<Record<string, NextExerciseSuggestion[]>>({});
+  const [previousPerformanceByName, setPreviousPerformanceByName] = useState<Record<string, ExercisePerformance | null>>({});
   const [saving, setSaving] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
 
@@ -117,6 +99,44 @@ export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: 
   useEffect(() => {
     listFrequentExerciseNames().then(setSuggestions);
   }, []);
+
+  // 名前が未入力の種目カードそれぞれについて、「直前の種目の次によく行う種目」を取得する。
+  // 直前の種目名ごとに1回だけ問い合わせ、結果は名前をキーにキャッシュして使い回す。
+  useEffect(() => {
+    const namesToFetch = new Set<string>();
+    exercises.forEach((ex, i) => {
+      if (ex.name.trim() !== '' || i === 0) return;
+      const prevName = exercises[i - 1].name.trim();
+      if (prevName !== '' && !(prevName in nextSuggestionsByName)) {
+        namesToFetch.add(prevName);
+      }
+    });
+    namesToFetch.forEach((name) => {
+      listNextExerciseSuggestions(name).then((rows) => {
+        setNextSuggestionsByName((prev) => ({ ...prev, [name]: rows }));
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exercises]);
+
+  // 種目名が入力されたら、その種目の前回の記録（重量・レップ数）を調べる。
+  // 入力中の1文字ごとに問い合わせないよう、少し待ってから（入力が落ち着いてから）まとめて取得する。
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const namesToFetch = new Set<string>();
+      exercises.forEach((ex) => {
+        const name = ex.name.trim();
+        if (name !== '' && !(name in previousPerformanceByName)) namesToFetch.add(name);
+      });
+      namesToFetch.forEach((name) => {
+        getLastExercisePerformance(name).then((perf) => {
+          setPreviousPerformanceByName((prev) => ({ ...prev, [name]: perf ?? null }));
+        });
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exercises]);
 
   function updateExercise(key: string, patch: Partial<DraftExercise>) {
     setExercises((prev) => prev.map((ex) => (ex.key === key ? { ...ex, ...patch } : ex)));
@@ -155,10 +175,37 @@ export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: 
     );
   }
 
+  function copyPreviousSets(exerciseKey: string, sets: { weight: number; reps: number }[]) {
+    const apply = () => {
+      setExercises((prev) =>
+        prev.map((ex) =>
+          ex.key !== exerciseKey
+            ? ex
+            : { ...ex, sets: sets.map((s) => ({ key: makeKey(), weight: String(s.weight), reps: String(s.reps) })) }
+        )
+      );
+    };
+
+    // すでに何か入力済みなら、無言で上書きせず確認する。まだ空欄（デフォルトの1セットのみ）なら
+    // 失うものがないので、確認なしでそのまま反映する。
+    const target = exercises.find((ex) => ex.key === exerciseKey);
+    const hasEnteredValues = !!target && target.sets.some((s) => s.weight.trim() !== '' || s.reps.trim() !== '');
+
+    if (hasEnteredValues) {
+      Alert.alert('入力内容を上書きしますか？', '入力済みのセットが前回の記録に置き換わります。', [
+        { text: 'キャンセル', style: 'cancel' },
+        { text: '上書きする', style: 'destructive', onPress: apply },
+      ]);
+    } else {
+      apply();
+    }
+  }
+
   async function handleSave() {
     const cleaned: ExerciseDraft[] = exercises
       .map((ex) => ({
         name: ex.name.trim(),
+        memo: ex.memo.trim() === '' ? null : ex.memo.trim(),
         sets: ex.sets
           .map((s) => ({ weight: Number(s.weight) || 0, reps: Math.trunc(Number(s.reps)) || 0 }))
           .filter((s) => s.reps > 0),
@@ -172,7 +219,7 @@ export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: 
 
     setSaving(true);
     try {
-      await onSubmit({ date, memo: memo.trim() === '' ? null : memo.trim(), exercises: cleaned });
+      await onSubmit({ date, exercises: cleaned });
     } catch (e) {
       Alert.alert('保存に失敗しました', e instanceof Error ? e.message : String(e));
     } finally {
@@ -219,28 +266,29 @@ export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: 
           </View>
         ) : null}
 
-        <TextInput
-          style={styles.memoInput}
-          placeholder="メモ（任意）"
-          placeholderTextColor={colors.textMuted}
-          value={memo}
-          onChangeText={setMemo}
-        />
-
-        {exercises.map((exercise, index) => (
-          <ExerciseCard
-            key={exercise.key}
-            index={index}
-            exercise={exercise}
-            suggestions={suggestions}
-            canRemove={exercises.length > 1}
-            onChangeName={(name) => updateExercise(exercise.key, { name })}
-            onRemoveExercise={() => removeExercise(exercise.key)}
-            onChangeSet={(setKey, patch) => updateSet(exercise.key, setKey, patch)}
-            onRemoveSet={(setKey) => removeSet(exercise.key, setKey)}
-            onAddSet={() => addSet(exercise.key)}
-          />
-        ))}
+        {exercises.map((exercise, index) => {
+          const prevName = index > 0 ? exercises[index - 1].name.trim() : '';
+          const currentName = exercise.name.trim();
+          return (
+            <ExerciseCard
+              key={exercise.key}
+              index={index}
+              exercise={exercise}
+              suggestions={suggestions}
+              nextExerciseName={prevName || undefined}
+              nextExerciseSuggestions={prevName ? nextSuggestionsByName[prevName] : undefined}
+              previousPerformance={currentName ? previousPerformanceByName[currentName] : undefined}
+              canRemove={exercises.length > 1}
+              onChangeName={(name) => updateExercise(exercise.key, { name })}
+              onChangeMemo={(memo) => updateExercise(exercise.key, { memo })}
+              onRemoveExercise={() => removeExercise(exercise.key)}
+              onChangeSet={(setKey, patch) => updateSet(exercise.key, setKey, patch)}
+              onRemoveSet={(setKey) => removeSet(exercise.key, setKey)}
+              onAddSet={() => addSet(exercise.key)}
+              onCopyPreviousSets={(sets) => copyPreviousSets(exercise.key, sets)}
+            />
+          );
+        })}
 
         <Pressable style={({ pressed }) => [styles.addExerciseButton, pressed && styles.pressed]} onPress={addExercise}>
           <Text style={styles.addExerciseButtonText}>＋ 種目を追加</Text>
@@ -262,23 +310,46 @@ function ExerciseCard({
   index,
   exercise,
   suggestions,
+  nextExerciseName,
+  nextExerciseSuggestions,
+  previousPerformance,
   canRemove,
   onChangeName,
+  onChangeMemo,
   onRemoveExercise,
   onChangeSet,
   onRemoveSet,
   onAddSet,
+  onCopyPreviousSets,
 }: {
   index: number;
   exercise: DraftExercise;
   suggestions: string[];
+  /** 1つ前の種目の名前（あれば）。「◯◯の次によく行う種目」の見出しに使う */
+  nextExerciseName?: string;
+  /** nextExerciseName の次によく行われる種目。未取得なら undefined、取得済みで0件なら空配列 */
+  nextExerciseSuggestions?: NextExerciseSuggestion[];
+  /** この種目名での前回の記録。未取得なら undefined、記録なしなら null */
+  previousPerformance?: ExercisePerformance | null;
   canRemove: boolean;
   onChangeName: (name: string) => void;
+  onChangeMemo: (memo: string) => void;
   onRemoveExercise: () => void;
   onChangeSet: (setKey: string, patch: Partial<DraftSet>) => void;
   onRemoveSet: (setKey: string) => void;
   onAddSet: () => void;
+  onCopyPreviousSets: (sets: { weight: number; reps: number }[]) => void;
 }) {
+  // 「次の種目」の提案があればそれを優先する。なければ、履歴が少ない場合も含めて
+  // 「よく使う種目」にフォールバックする。
+  const hasNextSuggestions = !!nextExerciseSuggestions && nextExerciseSuggestions.length > 0;
+  const suggestionCaption = hasNextSuggestions ? `「${nextExerciseName}」の次によく行う種目` : 'よく使う種目';
+  const suggestionChips: { key: string; label: string; onPress: () => void }[] = hasNextSuggestions
+    ? nextExerciseSuggestions!.map((s) => ({ key: s.name, label: s.name, onPress: () => onChangeName(s.name) }))
+    : suggestions.map((s) => ({ key: s, label: s, onPress: () => onChangeName(s) }));
+
+  const hasPreviousPerformance = !!previousPerformance && previousPerformance.sets.length > 0;
+
   return (
     <View style={styles.exerciseCard}>
       <View style={styles.exerciseHeader}>
@@ -298,13 +369,32 @@ function ExerciseCard({
         onChangeText={onChangeName}
       />
 
-      {exercise.name.trim() === '' && suggestions.length > 0 ? (
-        <View style={styles.suggestionRow}>
-          {suggestions.map((s) => (
-            <Pressable key={s} style={styles.suggestionChip} onPress={() => onChangeName(s)}>
-              <Text style={styles.suggestionChipText}>{s}</Text>
-            </Pressable>
-          ))}
+      {exercise.name.trim() === '' && suggestionChips.length > 0 ? (
+        <View style={styles.suggestionBlock}>
+          <Text style={styles.suggestionCaption}>{suggestionCaption}</Text>
+          <View style={styles.suggestionRow}>
+            {suggestionChips.map((chip) => (
+              <Pressable key={chip.key} style={styles.suggestionChip} onPress={chip.onPress}>
+                <Text style={styles.suggestionChipText}>{chip.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {exercise.name.trim() !== '' && hasPreviousPerformance ? (
+        <View style={styles.previousBlock}>
+          <Text style={styles.previousCaption}>前回（{formatDateJa(previousPerformance!.date)}）</Text>
+          <Text style={styles.previousValues}>
+            {previousPerformance!.sets.map((s) => `${s.weight}kg×${s.reps}回`).join('、')}
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.previousCopyButton, pressed && styles.pressed]}
+            onPress={() => onCopyPreviousSets(previousPerformance!.sets)}
+            hitSlop={8}
+          >
+            <Text style={styles.previousCopyButtonText}>この内容をコピー</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -344,9 +434,17 @@ function ExerciseCard({
         </View>
       ))}
 
-      <Pressable style={({ pressed }) => [styles.addSetButton, pressed && styles.pressed]} onPress={onAddSet}>
+      <Pressable style={({ pressed }) => [styles.addSetButton, pressed && styles.pressed]} onPress={onAddSet} hitSlop={8}>
         <Text style={styles.addSetButtonText}>＋ セットを追加</Text>
       </Pressable>
+
+      <TextInput
+        style={styles.exerciseMemoInput}
+        placeholder="この種目のメモ（任意）"
+        placeholderTextColor={colors.textMuted}
+        value={exercise.memo}
+        onChangeText={onChangeMemo}
+      />
     </View>
   );
 }
@@ -415,16 +513,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     overflow: 'hidden',
   },
-  memoInput: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: colors.text,
-  },
   exerciseCard: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -455,6 +543,13 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     paddingBottom: 8,
   },
+  suggestionBlock: {
+    gap: 6,
+  },
+  suggestionCaption: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
   suggestionRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -471,6 +566,29 @@ const styles = StyleSheet.create({
   suggestionChipText: {
     fontSize: 13,
     color: colors.text,
+  },
+  previousBlock: {
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    padding: 10,
+    gap: 4,
+  },
+  previousCaption: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  previousValues: {
+    fontSize: 14,
+    color: colors.text,
+  },
+  previousCopyButton: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  previousCopyButtonText: {
+    fontSize: 13,
+    color: colors.accent,
+    fontWeight: '600',
   },
   setHeaderRow: {
     flexDirection: 'row',
@@ -525,6 +643,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.accent,
     fontWeight: '600',
+  },
+  exerciseMemoInput: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: colors.text,
   },
   addExerciseButton: {
     borderWidth: 1,

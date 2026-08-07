@@ -2,8 +2,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import CenteredMessage from '../src/components/CenteredMessage';
 import { listWorkoutsWithExerciseCount, type Workout } from '../src/db/queries';
 import { colors } from '../src/theme/colors';
+import { formatDateJa } from '../src/utils/date';
 
 type WorkoutRow = Workout & { exerciseCount: number };
 
@@ -30,9 +32,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       {!loading && workouts.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>まだ記録がありません</Text>
-        </View>
+        <CenteredMessage text="まだ記録がありません" />
       ) : (
         <FlatList
           data={workouts}
@@ -44,8 +44,7 @@ export default function HomeScreen() {
               // 詳細画面へ。pathname と params を分けて書くと打ち間違いを型チェックできる
               onPress={() => router.push({ pathname: '/workout/[id]', params: { id: String(item.id) } })}
             >
-              <Text style={styles.cardDate}>{item.date}</Text>
-              {item.memo ? <Text style={styles.cardMemo}>{item.memo}</Text> : null}
+              <Text style={styles.cardDate}>{formatDateJa(item.date)}</Text>
               <Text style={styles.cardMeta}>{item.exerciseCount} 種目</Text>
             </Pressable>
           )}
@@ -66,15 +65,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    color: colors.textMuted,
-    fontSize: 15,
-  },
   listContent: {
     padding: 16,
     paddingBottom: 96, // 下の丸ボタンにリスト末尾が隠れないよう余白を確保
@@ -94,10 +84,6 @@ const styles = StyleSheet.create({
   cardDate: {
     fontSize: 13,
     color: colors.textMuted,
-  },
-  cardMemo: {
-    fontSize: 15,
-    color: colors.text,
   },
   cardMeta: {
     fontSize: 13,

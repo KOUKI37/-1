@@ -8,6 +8,13 @@
       "when": 1785917659320,
       "tag": "0000_hot_silver_surfer",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1786067099737,
+      "tag": "0001_groovy_daredevil",
+      "breakpoints": true
     }
   ]
 }

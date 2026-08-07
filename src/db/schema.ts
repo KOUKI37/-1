@@ -13,7 +13,6 @@ export const workouts = sqliteTable('workout', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   /** 'YYYY-MM-DD' 形式の文字列で保存する */
   date: text('date').notNull(),
-  memo: text('memo'),
 });
 
 export const exerciseEntries = sqliteTable('exercise_entry', {
@@ -24,6 +23,8 @@ export const exerciseEntries = sqliteTable('exercise_entry', {
   name: text('name').notNull(),
   /** 同じワークアウト内での表示順（0始まり） */
   order: integer('sort_order').notNull(),
+  /** その種目についてのメモ（任意）。ワークアウト全体ではなく種目ごとに持つ */
+  memo: text('memo'),
 });
 
 export const setEntries = sqliteTable('set_entry', {

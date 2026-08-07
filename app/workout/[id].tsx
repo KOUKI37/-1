@@ -2,8 +2,10 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import CenteredMessage from '../../src/components/CenteredMessage';
 import { deleteWorkout, getWorkoutWithDetails, type WorkoutWithDetails } from '../../src/db/queries';
 import { colors } from '../../src/theme/colors';
+import { formatDateJa } from '../../src/utils/date';
 
 /**
  * トレーニング詳細画面。
@@ -35,27 +37,18 @@ export default function WorkoutDetailScreen() {
   };
 
   if (workout === undefined) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loading}>読み込み中...</Text>
-      </View>
-    );
+    return <CenteredMessage loading text="読み込み中..." />;
   }
 
   if (workout === null) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loading}>この記録は見つかりませんでした（削除済みの可能性があります）</Text>
-      </View>
-    );
+    return <CenteredMessage text="この記録は見つかりませんでした（削除済みの可能性があります）" />;
   }
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Text style={styles.date}>{workout.date}</Text>
-          {workout.memo ? <Text style={styles.memo}>{workout.memo}</Text> : null}
+          <Text style={styles.date}>{formatDateJa(workout.date)}</Text>
         </View>
 
         {workout.exerciseEntries.length === 0 ? (
@@ -69,6 +62,7 @@ export default function WorkoutDetailScreen() {
                   {set.setNumber}セット目　{set.weight}kg × {set.reps}回
                 </Text>
               ))}
+              {entry.memo ? <Text style={styles.exerciseMemo}>メモ: {entry.memo}</Text> : null}
             </View>
           ))
         )}
@@ -106,11 +100,6 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
-  loading: {
-    padding: 24,
-    textAlign: 'center',
-    color: colors.textMuted,
-  },
   header: {
     gap: 4,
     marginBottom: 8,
@@ -118,10 +107,6 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 15,
     color: colors.textMuted,
-  },
-  memo: {
-    fontSize: 16,
-    color: colors.text,
   },
   emptyText: {
     color: colors.textMuted,
@@ -142,6 +127,15 @@ const styles = StyleSheet.create({
   setRow: {
     fontSize: 14,
     color: colors.textMuted,
+  },
+  exerciseMemo: {
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    fontSize: 13,
+    color: colors.textMuted,
+    fontStyle: 'italic',
   },
   actionArea: {
     margin: 16,
