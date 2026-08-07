@@ -6,7 +6,8 @@
 
 | ファイル名 | 内容 |
 |---|---|
-| `home.png` | ホーム画面（トレーニング履歴の一覧） |
+| `<img width="1170" height="2532" alt="home" src="https://github.com/user-attachments/assets/5cac9e1e-0d99-4caf-be5c-416efbbb8b8c" />
+` | ホーム画面（トレーニング履歴の一覧） |
 | `input.png` | 記録の入力画面（種目・セットの入力） |
 | `detail.png` | トレーニング詳細画面 |
 | `copy.png` | 「前回コピー」で複製した直後の画面（前回の内容が引き継がれている状態） |
