@@ -1,5 +1,5 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -20,8 +20,12 @@ import {
   type ExercisePerformance,
   type NextExerciseSuggestion,
 } from '../db/queries';
-import { colors } from '../theme/colors';
+import type { ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeProvider';
 import { formatDateJa, shiftDateString, toDateString, todayString } from '../utils/date';
+import Button from './Button';
+import Card from './Card';
+import TextField from './TextField';
 
 /**
  * 記録の入力フォーム（新規作成・編集の両方で使う共通部品）。
@@ -72,6 +76,9 @@ function draftExercisesFromInitial(initial: WorkoutFormInitial | undefined): Dra
 }
 
 export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [date, setDate] = useState(initial?.date ?? todayString());
   const [exercises, setExercises] = useState<DraftExercise[]>(() => draftExercisesFromInitial(initial));
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -295,13 +302,12 @@ export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: 
         </Pressable>
       </ScrollView>
 
-      <Pressable
-        style={({ pressed }) => [styles.saveButton, pressed && styles.pressed, saving && styles.saveButtonDisabled]}
+      <Button
+        label={saving ? '保存中...' : submitLabel}
         onPress={handleSave}
         disabled={saving}
-      >
-        <Text style={styles.saveButtonText}>{saving ? '保存中...' : submitLabel}</Text>
-      </Pressable>
+        style={styles.saveButton}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -340,6 +346,9 @@ function ExerciseCard({
   onAddSet: () => void;
   onCopyPreviousSets: (sets: { weight: number; reps: number }[]) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   // 「次の種目」の提案があればそれを優先する。なければ、履歴が少ない場合も含めて
   // 「よく使う種目」にフォールバックする。
   const hasNextSuggestions = !!nextExerciseSuggestions && nextExerciseSuggestions.length > 0;
@@ -351,9 +360,11 @@ function ExerciseCard({
   const hasPreviousPerformance = !!previousPerformance && previousPerformance.sets.length > 0;
 
   return (
-    <View style={styles.exerciseCard}>
+    <Card style={styles.exerciseCard}>
       <View style={styles.exerciseHeader}>
-        <Text style={styles.exerciseIndex}>種目 {index + 1}</Text>
+        <View style={styles.exerciseIndexBadge}>
+          <Text style={styles.exerciseIndexText}>種目 {index + 1}</Text>
+        </View>
         {canRemove ? (
           <Pressable onPress={onRemoveExercise} hitSlop={8}>
             <Text style={styles.removeExerciseText}>種目を削除</Text>
@@ -408,18 +419,16 @@ function ExerciseCard({
       {exercise.sets.map((set, setIndex) => (
         <View key={set.key} style={styles.setRow}>
           <Text style={[styles.setNumberText, styles.setNumberCol]}>{setIndex + 1}</Text>
-          <TextInput
+          <TextField
             style={[styles.setInput, styles.setInputCol]}
             placeholder="0"
-            placeholderTextColor={colors.textMuted}
             keyboardType="decimal-pad"
             value={set.weight}
             onChangeText={(weight) => onChangeSet(set.key, { weight })}
           />
-          <TextInput
+          <TextField
             style={[styles.setInput, styles.setInputCol]}
             placeholder="0"
-            placeholderTextColor={colors.textMuted}
             keyboardType="number-pad"
             value={set.reps}
             onChangeText={(reps) => onChangeSet(set.key, { reps })}
@@ -438,249 +447,231 @@ function ExerciseCard({
         <Text style={styles.addSetButtonText}>＋ セットを追加</Text>
       </Pressable>
 
-      <TextInput
+      <TextField
         style={styles.exerciseMemoInput}
         placeholder="この種目のメモ（任意）"
-        placeholderTextColor={colors.textMuted}
         value={exercise.memo}
         onChangeText={onChangeMemo}
       />
-    </View>
+    </Card>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-    gap: 16,
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  banner: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  bannerText: {
-    fontSize: 13,
-    color: colors.text,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: 8,
-  },
-  dateArrow: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  dateArrowText: {
-    fontSize: 18,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  dateLabelWrap: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 2,
-  },
-  dateLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  dateHint: {
-    fontSize: 11,
-    color: colors.accent,
-  },
-  calendarWrap: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-  exerciseCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
-    gap: 10,
-  },
-  exerciseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  exerciseIndex: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  removeExerciseText: {
-    fontSize: 13,
-    color: '#FF3B30',
-  },
-  nameInput: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingBottom: 8,
-  },
-  suggestionBlock: {
-    gap: 6,
-  },
-  suggestionCaption: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  suggestionRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  suggestionChip: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  suggestionChipText: {
-    fontSize: 13,
-    color: colors.text,
-  },
-  previousBlock: {
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    padding: 10,
-    gap: 4,
-  },
-  previousCaption: {
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  previousValues: {
-    fontSize: 14,
-    color: colors.text,
-  },
-  previousCopyButton: {
-    alignSelf: 'flex-start',
-    marginTop: 2,
-  },
-  previousCopyButtonText: {
-    fontSize: 13,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  setHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  setHeaderText: {
-    fontSize: 11,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  setNumberCol: {
-    width: 40,
-  },
-  setInputCol: {
-    flex: 1,
-  },
-  setRemoveCol: {
-    width: 28,
-    alignItems: 'center',
-  },
-  setRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  setNumberText: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  setInput: {
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: 8,
-    textAlign: 'center',
-    fontSize: 15,
-    color: colors.text,
-  },
-  removeSetText: {
-    fontSize: 16,
-    color: colors.textMuted,
-  },
-  addSetButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  addSetButtonText: {
-    fontSize: 14,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  exerciseMemoInput: {
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    color: colors.text,
-  },
-  addExerciseButton: {
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  addExerciseButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.accent,
-  },
-  saveButton: {
-    margin: 16,
-    marginTop: 0,
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonText: {
-    color: colors.accentText,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 16,
+      paddingBottom: 32,
+      gap: 16,
+    },
+    pressed: {
+      opacity: 0.7,
+    },
+    banner: {
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    bannerText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    dateRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 8,
+    },
+    dateArrow: {
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+    },
+    dateArrowText: {
+      fontSize: 18,
+      color: colors.accent,
+      fontWeight: '600',
+    },
+    dateLabelWrap: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 2,
+    },
+    dateLabel: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    dateHint: {
+      fontSize: 11,
+      color: colors.accent,
+    },
+    calendarWrap: {
+      backgroundColor: colors.surface,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      overflow: 'hidden',
+    },
+    exerciseCard: {
+      gap: 14,
+    },
+    exerciseHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    exerciseIndexBadge: {
+      backgroundColor: colors.accentBackground,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    exerciseIndexText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.accent,
+      letterSpacing: 0.2,
+    },
+    removeExerciseText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.danger,
+    },
+    nameInput: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingBottom: 8,
+    },
+    suggestionBlock: {
+      gap: 6,
+    },
+    suggestionCaption: {
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    suggestionRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    suggestionChip: {
+      backgroundColor: colors.background,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    suggestionChipText: {
+      fontSize: 13,
+      color: colors.text,
+    },
+    previousBlock: {
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      padding: 10,
+      gap: 4,
+    },
+    previousCaption: {
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    previousValues: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    previousCopyButton: {
+      alignSelf: 'flex-start',
+      marginTop: 2,
+    },
+    previousCopyButtonText: {
+      fontSize: 13,
+      color: colors.accent,
+      fontWeight: '600',
+    },
+    setHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    setHeaderText: {
+      fontSize: 11,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    setNumberCol: {
+      width: 40,
+    },
+    setInputCol: {
+      flex: 1,
+    },
+    setRemoveCol: {
+      width: 28,
+      alignItems: 'center',
+    },
+    setRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    setNumberText: {
+      fontSize: 14,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    setInput: {
+      backgroundColor: colors.background,
+      textAlign: 'center',
+    },
+    removeSetText: {
+      fontSize: 16,
+      color: colors.textMuted,
+    },
+    addSetButton: {
+      alignSelf: 'flex-start',
+      paddingVertical: 6,
+      paddingHorizontal: 4,
+    },
+    addSetButtonText: {
+      fontSize: 14,
+      color: colors.accent,
+      fontWeight: '600',
+    },
+    exerciseMemoInput: {
+      backgroundColor: colors.background,
+      fontSize: 13,
+    },
+    addExerciseButton: {
+      borderWidth: 1,
+      borderColor: colors.accent,
+      borderStyle: 'dashed',
+      borderRadius: 8,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    addExerciseButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.accent,
+    },
+    saveButton: {
+      margin: 16,
+      marginTop: 0,
+    },
+  });
+}

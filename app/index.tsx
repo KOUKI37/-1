@@ -1,10 +1,12 @@
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import CenteredMessage from '../src/components/CenteredMessage';
+import Card from '../src/components/Card';
 import { listWorkoutsWithExerciseCount, type Workout } from '../src/db/queries';
-import { colors } from '../src/theme/colors';
+import type { ThemeColors } from '../src/theme/colors';
+import { fonts } from '../src/theme/fonts';
+import { useTheme } from '../src/theme/ThemeProvider';
 import { formatDateJa } from '../src/utils/date';
 
 type WorkoutRow = Workout & { exerciseCount: number };
@@ -17,6 +19,8 @@ type WorkoutRow = Workout & { exerciseCount: number };
  */
 export default function HomeScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [workouts, setWorkouts] = useState<WorkoutRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,22 +35,42 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* このホーム画面だけヘッダー右に設定アイコンを出す */}
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Pressable onPress={() => router.push('/settings')} hitSlop={8} style={styles.settingsButton}>
+              <Text style={styles.settingsIcon}>⚙</Text>
+            </Pressable>
+          ),
+        }}
+      />
+
       {!loading && workouts.length === 0 ? (
-        <CenteredMessage text="まだ記録がありません" />
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>まだ記録がない</Text>
+          <Text style={styles.emptyBody}>右下の「＋ 記録する」から、最初のトレーニングを記録しよう。</Text>
+        </View>
       ) : (
         <FlatList
           data={workouts}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-              // 詳細画面へ。pathname と params を分けて書くと打ち間違いを型チェックできる
+            <Card
               onPress={() => router.push({ pathname: '/workout/[id]', params: { id: String(item.id) } })}
+              accent
             >
-              <Text style={styles.cardDate}>{formatDateJa(item.date)}</Text>
-              <Text style={styles.cardMeta}>{item.exerciseCount} 種目</Text>
-            </Pressable>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardDate}>{formatDateJa(item.date)}</Text>
+                <View style={styles.cardRight}>
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{item.exerciseCount}種目</Text>
+                  </View>
+                  <Text style={styles.chevron}>›</Text>
+                </View>
+              </View>
+            </Card>
           )}
         />
       )}
@@ -61,49 +85,97 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 96, // 下の丸ボタンにリスト末尾が隠れないよう余白を確保
-    gap: 12,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    gap: 4,
-  },
-  cardPressed: {
-    opacity: 0.6,
-  },
-  cardDate: {
-    fontSize: 13,
-    color: colors.textMuted,
-  },
-  cardMeta: {
-    fontSize: 13,
-    color: colors.textMuted,
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 28,
-    backgroundColor: colors.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 28,
-  },
-  fabPressed: {
-    opacity: 0.8,
-  },
-  fabText: {
-    color: colors.accentText,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    settingsButton: {
+      paddingHorizontal: 4,
+    },
+    settingsIcon: {
+      fontSize: 20,
+      color: colors.headerText,
+    },
+    empty: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      padding: 32,
+    },
+    emptyTitle: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    emptyBody: {
+      fontSize: 14,
+      color: colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    listContent: {
+      padding: 16,
+      paddingBottom: 96, // 下の丸ボタンにリスト末尾が隠れないよう余白を確保
+      gap: 12,
+    },
+    cardRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    cardDate: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: colors.text,
+      flexShrink: 1,
+    },
+    cardRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    badge: {
+      backgroundColor: colors.accentBackground,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.accent,
+      letterSpacing: 0.2,
+    },
+    chevron: {
+      fontSize: 20,
+      color: colors.textMuted,
+    },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      bottom: 28,
+      backgroundColor: colors.accent,
+      paddingHorizontal: 22,
+      paddingVertical: 15,
+      borderRadius: 28,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    fabPressed: {
+      opacity: 0.85,
+    },
+    fabText: {
+      color: colors.accentText,
+      fontSize: 15,
+      fontFamily: fonts.display,
+      letterSpacing: 0.3,
+    },
+  });
+}

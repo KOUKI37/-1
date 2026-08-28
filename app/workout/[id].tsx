@@ -1,10 +1,13 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import Button from '../../src/components/Button';
+import Card from '../../src/components/Card';
 import CenteredMessage from '../../src/components/CenteredMessage';
 import { deleteWorkout, getWorkoutWithDetails, type WorkoutWithDetails } from '../../src/db/queries';
-import { colors } from '../../src/theme/colors';
+import type { ThemeColors } from '../../src/theme/colors';
+import { useTheme } from '../../src/theme/ThemeProvider';
 import { formatDateJa } from '../../src/utils/date';
 
 /**
@@ -14,6 +17,8 @@ import { formatDateJa } from '../../src/utils/date';
  */
 export default function WorkoutDetailScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const workoutId = Number(id);
 
@@ -49,146 +54,159 @@ export default function WorkoutDetailScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Text style={styles.date}>{formatDateJa(workout.date)}</Text>
+          <View style={styles.countBadge}>
+            <Text style={styles.countBadgeText}>{workout.exerciseEntries.length}種目</Text>
+          </View>
         </View>
 
         {workout.exerciseEntries.length === 0 ? (
           <Text style={styles.emptyText}>種目がまだありません</Text>
         ) : (
-          workout.exerciseEntries.map((entry) => (
-            <View key={entry.id} style={styles.exerciseCard}>
+          workout.exerciseEntries.map((entry, index) => (
+            <Card key={entry.id} accent style={styles.exerciseCard}>
+              <View style={styles.exerciseIndexBadge}>
+                <Text style={styles.exerciseIndexText}>種目 {index + 1}</Text>
+              </View>
               <Text style={styles.exerciseName}>{entry.name}</Text>
-              {entry.sets.map((set) => (
-                <Text key={set.id} style={styles.setRow}>
-                  {set.setNumber}セット目　{set.weight}kg × {set.reps}回
-                </Text>
-              ))}
+              <View style={styles.setList}>
+                {entry.sets.map((set) => (
+                  <View key={set.id} style={styles.setRow}>
+                    <Text style={styles.setNumber}>{set.setNumber}</Text>
+                    <Text style={styles.setValue}>
+                      {set.weight}
+                      <Text style={styles.setUnit}>kg</Text> × {set.reps}
+                      <Text style={styles.setUnit}>回</Text>
+                    </Text>
+                  </View>
+                ))}
+              </View>
               {entry.memo ? <Text style={styles.exerciseMemo}>メモ: {entry.memo}</Text> : null}
-            </View>
+            </Card>
           ))
         )}
       </ScrollView>
 
       <View style={styles.actionArea}>
-        <Pressable
-          style={({ pressed }) => [styles.copyButton, pressed && styles.copyButtonPressed]}
+        <Button
+          label="この内容をコピーして今日の記録にする"
+          variant="primary"
           onPress={() => router.push({ pathname: '/workout/new', params: { copyFrom: String(workoutId) } })}
-        >
-          <Text style={styles.copyButtonText}>この内容をコピーして今日の記録にする</Text>
-        </Pressable>
+        />
 
         <View style={styles.actionRow}>
-          <Pressable
-            style={({ pressed }) => [styles.editButton, pressed && styles.editButtonPressed]}
+          <Button
+            label="編集する"
+            variant="outline"
+            style={styles.actionButton}
             onPress={() => router.push({ pathname: '/workout/[id]/edit', params: { id: String(workoutId) } })}
-          >
-            <Text style={styles.editButtonText}>編集する</Text>
-          </Pressable>
-          <Pressable style={({ pressed }) => [styles.deleteButton, pressed && styles.deleteButtonPressed]} onPress={handleDelete}>
-            <Text style={styles.deleteButtonText}>削除する</Text>
-          </Pressable>
+          />
+          <Button label="削除する" variant="danger" style={styles.actionButton} onPress={handleDelete} />
         </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    gap: 12,
-  },
-  header: {
-    gap: 4,
-    marginBottom: 8,
-  },
-  date: {
-    fontSize: 15,
-    color: colors.textMuted,
-  },
-  emptyText: {
-    color: colors.textMuted,
-  },
-  exerciseCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    gap: 6,
-  },
-  exerciseName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  setRow: {
-    fontSize: 14,
-    color: colors.textMuted,
-  },
-  exerciseMemo: {
-    marginTop: 4,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    fontSize: 13,
-    color: colors.textMuted,
-    fontStyle: 'italic',
-  },
-  actionArea: {
-    margin: 16,
-    gap: 12,
-  },
-  copyButton: {
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    backgroundColor: colors.accent,
-  },
-  copyButtonPressed: {
-    opacity: 0.85,
-  },
-  copyButtonText: {
-    color: colors.accentText,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  editButton: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.accent,
-  },
-  editButtonPressed: {
-    backgroundColor: colors.background,
-  },
-  editButtonText: {
-    color: colors.accent,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    flex: 1,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-  },
-  deleteButtonPressed: {
-    backgroundColor: '#FF3B3020',
-  },
-  deleteButtonText: {
-    color: '#FF3B30',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      padding: 16,
+      gap: 12,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    date: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    countBadge: {
+      backgroundColor: colors.accentBackground,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+    },
+    countBadgeText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.accent,
+      letterSpacing: 0.2,
+    },
+    emptyText: {
+      color: colors.textMuted,
+    },
+    exerciseCard: {
+      gap: 10,
+    },
+    exerciseIndexBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.accentBackground,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    exerciseIndexText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.accent,
+      letterSpacing: 0.2,
+    },
+    exerciseName: {
+      fontSize: 19,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    setList: {
+      gap: 6,
+    },
+    setRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    setNumber: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textMuted,
+      minWidth: 20,
+    },
+    setValue: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+    },
+    setUnit: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textMuted,
+    },
+    exerciseMemo: {
+      marginTop: 4,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      fontSize: 13,
+      color: colors.textMuted,
+      fontStyle: 'italic',
+    },
+    actionArea: {
+      margin: 16,
+      gap: 12,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    actionButton: {
+      flex: 1,
+    },
+  });
+}
