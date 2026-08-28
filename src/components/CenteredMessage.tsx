@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeProvider';
+import type { ThemeColors } from '../theme/colors';
 
 /**
  * 「読み込み中」「見つかりません」など、画面いっぱいに中央寄せで
@@ -8,6 +10,9 @@ import { colors } from '../theme/colors';
  * ばらつく（センタリングが漏れる・スピナーの有無が揃わない）のを防ぐ。
  */
 export default function CenteredMessage({ text, loading }: { text: string; loading?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   return (
     <View style={styles.container}>
       {loading ? <ActivityIndicator color={colors.accent} /> : null}
@@ -16,18 +21,20 @@ export default function CenteredMessage({ text, loading }: { text: string; loadi
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    backgroundColor: colors.background,
-    padding: 24,
-  },
-  text: {
-    color: colors.textMuted,
-    fontSize: 15,
-    textAlign: 'center',
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      backgroundColor: colors.background,
+      padding: 24,
+    },
+    text: {
+      color: colors.textMuted,
+      fontSize: 15,
+      textAlign: 'center',
+    },
+  });
+}
