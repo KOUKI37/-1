@@ -1,14 +1,12 @@
 import { DelaGothicOne_400Regular } from '@expo-google-fonts/dela-gothic-one';
-import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import migrations from '../drizzle/migrations';
 import CenteredMessage from '../src/components/CenteredMessage';
-import { db } from '../src/db/client';
+import { useDatabaseReady } from '../src/db/useDatabaseReady';
 import type { ThemeColors } from '../src/theme/colors';
 import { fonts } from '../src/theme/fonts';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
@@ -35,19 +33,19 @@ export default function RootLayout() {
 function RootLayoutNav() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { success: migrationSuccess, error: migrationError } = useMigrations(db, migrations);
+  const { ready: dbReady, error: dbError } = useDatabaseReady();
   const [fontsLoaded] = useFonts({ DelaGothicOne_400Regular });
 
-  if (migrationError) {
+  if (dbError) {
     return (
       <View style={styles.center}>
         <Text style={styles.errorTitle}>DB の初期化に失敗しました</Text>
-        <Text style={styles.errorBody}>{migrationError.message}</Text>
+        <Text style={styles.errorBody}>{dbError.message}</Text>
       </View>
     );
   }
 
-  if (!migrationSuccess || !fontsLoaded) {
+  if (!dbReady || !fontsLoaded) {
     return <CenteredMessage loading text="準備中..." />;
   }
 

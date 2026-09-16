@@ -1,0 +1,13 @@
+[build]
+  command = "npx expo export --platform web"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Expo Router の Web 版は SPA（1枚の index.html + クライアント側ルーティング）なので、
+# /workout/1 のような URL に直接アクセスされたときも index.html を返すようにする。
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
