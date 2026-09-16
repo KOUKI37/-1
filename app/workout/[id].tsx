@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import Button from '../../src/components/Button';
 import Card from '../../src/components/Card';
@@ -8,6 +8,7 @@ import CenteredMessage from '../../src/components/CenteredMessage';
 import { deleteWorkout, getWorkoutWithDetails, type WorkoutWithDetails } from '../../src/db/queries';
 import type { ThemeColors } from '../../src/theme/colors';
 import { useTheme } from '../../src/theme/ThemeProvider';
+import { confirmAsync } from '../../src/utils/alert';
 import { formatDateJa } from '../../src/utils/date';
 
 /**
@@ -31,14 +32,9 @@ export default function WorkoutDetailScreen() {
   useFocusEffect(reload);
 
   const handleDelete = () => {
-    Alert.alert('この記録を削除しますか？', '種目とセットの記録もすべて削除されます。', [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除する',
-        style: 'destructive',
-        onPress: () => deleteWorkout(workoutId).then(() => router.back()),
-      },
-    ]);
+    confirmAsync('この記録を削除しますか？', '種目とセットの記録もすべて削除されます。', '削除する').then((confirmed) => {
+      if (confirmed) deleteWorkout(workoutId).then(() => router.back());
+    });
   };
 
   if (workout === undefined) {

@@ -1,7 +1,6 @@
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,6 +21,7 @@ import {
 } from '../db/queries';
 import type { ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeProvider';
+import { confirmAsync, showAlert } from '../utils/alert';
 import { formatDateJa, shiftDateString, toDateString, todayString } from '../utils/date';
 import Button from './Button';
 import Card from './Card';
@@ -199,10 +199,11 @@ export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: 
     const hasEnteredValues = !!target && target.sets.some((s) => s.weight.trim() !== '' || s.reps.trim() !== '');
 
     if (hasEnteredValues) {
-      Alert.alert('入力内容を上書きしますか？', '入力済みのセットが前回の記録に置き換わります。', [
-        { text: 'キャンセル', style: 'cancel' },
-        { text: '上書きする', style: 'destructive', onPress: apply },
-      ]);
+      confirmAsync('入力内容を上書きしますか？', '入力済みのセットが前回の記録に置き換わります。', '上書きする').then(
+        (confirmed) => {
+          if (confirmed) apply();
+        }
+      );
     } else {
       apply();
     }
@@ -220,7 +221,7 @@ export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: 
       .filter((ex) => ex.name !== '' && ex.sets.length > 0);
 
     if (cleaned.length === 0) {
-      Alert.alert('保存できません', '種目名と、レップ数を入力したセットを1つ以上入力してください。');
+      showAlert('保存できません', '種目名と、レップ数を入力したセットを1つ以上入力してください。');
       return;
     }
 
@@ -228,7 +229,7 @@ export default function WorkoutForm({ initial, banner, submitLabel, onSubmit }: 
     try {
       await onSubmit({ date, exercises: cleaned });
     } catch (e) {
-      Alert.alert('保存に失敗しました', e instanceof Error ? e.message : String(e));
+      showAlert('保存に失敗しました', e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
